@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Signature element: physical out-of-service tag stripes */
+.hazard-stripe {
+  background: repeating-linear-gradient(
+    -45deg,
+    #f5a623 0px,
+    #f5a623 14px,
+    #0b0f14 14px,
+    #0b0f14 28px
+  );
+}
+
+.field-label {
+  @apply font-display uppercase tracking-[0.14em] text-[11px] text-dim;
+}
+
+.field-input {
+  @apply w-full bg-void border border-line rounded px-3 py-2.5 text-[15px] text-bone placeholder-dim/50 focus:outline-none focus:border-amber;
+}
+
+.btn-primary {
+  @apply w-full bg-amber text-void font-display uppercase tracking-[0.1em] text-lg font-semibold rounded px-4 py-3.5 active:translate-y-px disabled:opacity-40 disabled:cursor-not-allowed;
+}
+
+.btn-ghost {
+  @apply w-full bg-transparent border border-line text-dim font-display uppercase tracking-[0.1em] text-base font-medium rounded px-4 py-3 active:translate-y-px;
+}
+
+/* Print: show only the report sheet */
+@media print {
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .report-sheet {
+    display: block !important;
+    color: #111;
+  }
+  @page {
+    margin: 14mm;
+  }
+}
