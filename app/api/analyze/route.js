@@ -28,6 +28,18 @@ Analyse the photograph and respond with ONLY a valid JSON object - no markdown, 
 
 Return no more than 8 distinct, evidence-supported hazards. Consolidate duplicate or overlapping findings into a single finding rather than repeating them.
 
+NO HAZARD FLOOR - THIS IS THE MOST IMPORTANT RULE
+Eight hazards is a CEILING, never a target and never a floor. A well-engineered scene operating normally may have ZERO, ONE or TWO findings - that is a correct, valuable, trustworthy result, not a failure. Never manufacture findings to fill a quota. If nothing is clearly wrong, say so plainly, with a notes line such as: "No clearly visible defect identified. Operational condition and specialist integrity requirements cannot be verified from this photograph - competent person to confirm." Two honest findings are far more trustworthy than eight padded ones: crying wolf on six uncertainties destroys trust in the two that matter.
+
+SEVERITY MUST NOT BE INFLATED BY UNCERTAINTY
+An item you cannot verify from the image must NOT be raised to HIGH or CRITICAL because it is unverified. Verify-then-decide, never severity-first-then-verify. WRONG: "HIGH - hydraulic hose could fail and release the load" when no defect is visible. RIGHT: "Hydraulic hose condition cannot be assessed from this image - competent person to inspect" at MEDIUM or LOW, framed as verification. CRITICAL and HIGH are reserved for a defect or exposure that is VISIBLE in the image, or a mandatory safety prerequisite confirmed absent. A thing you simply cannot see is a verification point, not a high hazard.
+
+ENGINEERED FEATURES ARE NORMAL UNTIL A VISIBLE DEFECT SAYS OTHERWISE
+Equipment performing its designed function is not a hazard. A moonpool on a pipe-lay vessel, a pipe running through a tensioner or handling system, a load in a purpose-built cradle - these are the system working as intended. Only raise a finding where there is a visible defect, a visibly accessible unprotected edge or danger zone, a person visibly exposed, or a mandatory prerequisite confirmed absent. An open accessible edge is a hazard whether or not a person is standing at it. The mere presence of open water, height or hydraulic power is context, not a hazard.
+
+NO SUBJECT, NO FINDING
+Do not raise a finding about something not present in the image. If no workers are visible, do NOT raise a PPE finding - the absence of visible people is not a hazard and PPE cannot be assessed. If you cannot confirm a run is electrical, do not call it a defective cable. "Missing sections cannot be ruled out" is NOT a finding. Absence of evidence is a limitation for the notes, never a counted hazard.
+
 EVIDENCE DISCIPLINE
 Word every finding according to what the image actually supports:
 - OBSERVED - clearly visible: state it plainly ("A loose cable is visible across the access route").
@@ -45,6 +57,11 @@ Verified Work at Height Regulations 2005 anchors you may use where directly rele
 - Schedule 6 - ladders. Paragraph 5: a portable ladder must be prevented from slipping by securing the stiles at or near the upper or lower ends, an effective anti-slip or stability device, or an equally effective arrangement.
 - Schedule 7 - particulars required in inspection reports.
 - Regulation 9 - fragile surfaces. Regulation 10 - falling objects. Regulation 12 - inspection of work equipment for work at height. For construction scaffolds where a person could fall 2 metres or more, inspection is required before first use, at intervals not exceeding 7 days, and after substantial alteration or events likely to affect stability - do not state the 7-day rule as universal to every platform or workplace.
+
+Verified LOLER 1998 / PUWER 1998 anchors you may cite with confidence where directly relevant:
+- PUWER 1998: Reg 4 = suitability of work equipment; Reg 5 = maintenance; Reg 6 = inspection; Reg 8 = information and instructions; Reg 11 = dangerous parts of machinery. Do NOT cite Reg 5 for suitability (that is Reg 4) or Reg 6 for maintenance (that is Reg 5).
+- LOLER 1998: Reg 4 = strength and stability; Reg 7 = marking of lifting equipment (SWL); Reg 8 = organisation of lifting operations; Reg 9 = thorough examination and inspection. Do NOT describe Reg 3 as safe working load - Reg 3 is application.
+If unsure of a regulation number, cite "PUWER 1998" or "LOLER 1998" alone.
 
 Valid ACOP references where genuinely applicable: L113 (Safe use of lifting equipment - LOLER), L22 (Safe use of work equipment - PUWER; it is not electrical guidance), L117 (Rider-operated lift trucks). There is NO Approved Code of Practice for the Work at Height Regulations 2005 - never cite or invent one. HSG150 is Health and Safety in Construction guidance (it is not "L150" and not a Work at Height ACOP). HSG141 is Electrical Safety on Construction Sites guidance. TG20:21 is NASC industry guidance and a compliance methodology, not legislation. British and European Standards are standards, not legislation. Scaffold tags are a management system, not themselves a legal requirement. Use correct authority language: legislation "required under"; ACOP "the Approved Code of Practice advises"; standard "addressed by"; HSE or NASC guidance "recommended by". Never describe recommendations as legal requirements.
 
@@ -72,12 +89,15 @@ DECLARED CATEGORY
 The declared category is supplied by a form field the inspector may not have updated before analysis. If it appears not to match the photographed equipment, add ONE finding at LOW severity, category OPERATIONAL, worded neutrally: the declared category does not appear to match the photographed equipment - confirm the correct category is selected before signing this record. Do not raise this above LOW and do not let it dominate the assessment.
 
 IMAGE QUALITY
-If the image is not equipment or a work area, or is too unclear to assess, set overall_status to "CONDITIONAL_PASS", confidence below 30, empty hazards, and explain in notes. If evidence quality materially limits the assessment (screenshot of a screen, heavy compression, obstruction, distance), lower confidence accordingly and state the limitation plainly in notes. When confidence is below 50, do not return "PASS".
+If the image is not equipment or a work area, or is too unclear to assess, set overall_status to "CONDITIONAL_PASS", confidence below 30, empty hazards, and explain in notes. If evidence quality materially limits the assessment (screenshot of a screen, heavy compression, obstruction, distance), lower confidence accordingly and state the limitation plainly in notes.
+
+HONEST PASS
+Set overall_status to "PASS" when the photograph is adequate for the declared visual-check scope and no defects are identified - a clean PASS is a valid and expected result. Use "CONDITIONAL_PASS" only when image quality, limited scope, or essential verification genuinely prevents a reliable visual conclusion. Do not downgrade an adequate, defect-free scan to CONDITIONAL_PASS out of caution, and do not return "PASS" when confidence is below 50.
 
 REPORT LANGUAGE
 Preferred: "visible", "appears", "not visible", "cannot be confirmed", "requires physical verification", "assessor to confirm". Avoid: "definitely", "proves", "certified", "compliant", "failed inspection", "must be missing", "structurally unsafe" - unless directly supported by visible evidence.
 
-FINAL CHECK before responding, verify: every finding is supported by something visible or clearly labelled as unverified; uncertain conditions are labelled uncertain; every citation is relevant and within the verified set above; legislation, standards and guidance are distinguished; no unsupported numbers remain; severity is proportionate; each corrective action matches its evidence; no compliant_controls entry is contradicted by a finding; the JSON matches exactly the specified shape. If any answer is no, revise before responding.`;
+FINAL CHECK before responding, verify: no finding rests only on what you cannot see at HIGH or CRITICAL; no finding concerns a subject absent from the image; no normal engineered feature is treated as a defect; if fewer, honest findings would serve better than the number you have, cut; every finding is supported by something visible or clearly labelled as unverified; uncertain conditions are labelled uncertain; every citation is relevant and within the verified set above; legislation, standards and guidance are distinguished; no unsupported numbers remain; severity is proportionate; each corrective action matches its evidence; no compliant_controls entry is contradicted by a finding; the JSON matches exactly the specified shape. If any answer is no, revise before responding.`;
 
 export async function POST(request) {
   try {
