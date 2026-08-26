@@ -358,3 +358,51 @@ export const legacyStoredResult = {
   compliant_controls: ["Hard hats visible on both workers", "Load backrest fitted"],
   notes: "Legacy record produced before the evidence split.",
 };
+
+/** Shared by the duplicate-description regression cases. */
+export const DUPLICATE_DESCRIPTION = "Valve mass against the lift plan and lifting-accessory capacity";
+
+/** The demoted-hazard half: says the mass cannot be confirmed, so it leaves the hazard stream. */
+export const duplicateDescriptionHazard = {
+  evidence_type: "VISIBLE_UNSAFE_CONDITION",
+  severity: "HIGH",
+  category: "OPERATIONAL",
+  description: DUPLICATE_DESCRIPTION,
+  visible_evidence: "The valve mass is not marked and cannot be confirmed from the photograph.",
+  location: "Valve body",
+  action: "Confirm the valve mass before hoisting.",
+  confidence: 66,
+};
+
+/** The validated blocking half, carrying the identical description. */
+export const duplicateDescriptionBlockingPoint = {
+  evidence_type: "VERIFICATION_REQUIRED",
+  description: DUPLICATE_DESCRIPTION,
+  reason_unverified: "The valve mass is not marked or visible.",
+  verification_kind: "OPERATION_PREREQUISITE",
+  location: "Valve body, cast data plate",
+  regulation: "LOLER 1998",
+  required_check: "Confirm the valve mass against the lift plan and the rated capacity of every accessory.",
+  blocking_before_use: true,
+  blocking_reason:
+    "The load mass must be matched to the lift plan and accessory capacity before hoisting and cannot be established from the image.",
+};
+
+/**
+ * An imminent lift where a demoted hazard and a validated blocking prerequisite
+ * share one description. First-item-wins deduplication dropped the blocking half
+ * and released the lift as a clean pass.
+ */
+export const duplicateDescriptionOnImminentLift = {
+  equipment: { type: "Gate valve on lifting slings", category: "Lifting operation", model_estimate: "" },
+  operation_context: {
+    state: "OPERATION_IMMINENT",
+    visible_basis: "Valve rigged to a hook block with slings taut and workers standing clear.",
+    confidence: 85,
+  },
+  confidence: 82,
+  hazards: [duplicateDescriptionHazard],
+  verification_points: [duplicateDescriptionBlockingPoint],
+  compliant_controls: [],
+  notes: "Lift appears rigged and about to commence.",
+};

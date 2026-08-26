@@ -239,8 +239,13 @@ export async function POST(request) {
     // count below come from here, not from the model response.
     const { result, changes } = normaliseInspectionResult(raw);
     if (changes.length > 0) {
-      // Development/debugging only — never returned to the client.
-      console.log("[inspect] normalisation applied", { changes });
+      // Never returned to the client. Finding descriptions stay out of production
+      // logs — deployed environments record the count only.
+      if (process.env.NODE_ENV === "production") {
+        console.log("[inspect] normalisation applied", { count: changes.length });
+      } else {
+        console.log("[inspect] normalisation applied", { changes });
+      }
     }
 
     return Response.json({ result });

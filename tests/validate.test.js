@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { normaliseInspectionResult, resolveRisk, resolveStatus } from "@/lib/inspection/validate";
 import {
+  DUPLICATE_DESCRIPTION,
   bentHookLatch,
   cleanChainSlingUnreadableTag,
   cleanEquipmentVisibleIdentification,
   cosmeticPaintWear,
   deformedChainLink,
+  duplicateDescriptionBlockingPoint,
+  duplicateDescriptionHazard,
+  duplicateDescriptionOnImminentLift,
   frayedWireRope,
   poorQualityPhotograph,
   riggedLiftPrerequisitesUnresolved,
@@ -253,6 +257,94 @@ describe("blocking verification", () => {
     });
     expect(result.verification_points[0].blocking_before_use).toBe(false);
     expect(changes.some((c) => c.includes("no specific mandatory prerequisite"))).toBe(true);
+  });
+});
+
+describe("duplicate verification points", () => {
+  it("keeps the validated blocking prerequisite when a demoted hazard shares its description", () => {
+    const { result } = run(duplicateDescriptionOnImminentLift);
+
+    expect(result.hazards).toEqual([]);
+    expect(result.verification_points).toHaveLength(1);
+
+    const point = result.verification_points[0];
+    expect(point.verification_kind).toBe("OPERATION_PREREQUISITE");
+    expect(point.blocking_before_use).toBe(true);
+    expect(point.blocking_reason).toMatch(/load mass must be matched to the lift plan/i);
+
+    expect(result.overall_status).toBe("HOLD_FOR_VERIFICATION");
+    expect(result.risk_score).toBeNull();
+    expect(result.risk_basis).toBe("INSUFFICIENT_EVIDENCE");
+  });
+
+  it("merges the most complete fields from both halves", () => {
+    const { result } = run(duplicateDescriptionOnImminentLift);
+    const point = result.verification_points[0];
+    expect(point.description).toBe(DUPLICATE_DESCRIPTION);
+    expect(point.location).toBe("Valve body, cast data plate");
+    expect(point.regulation).toBe("LOLER 1998");
+    expect(point.required_check).toMatch(/rated capacity of every accessory/i);
+    expect(point.reason_unverified).toBeTruthy();
+  });
+
+  it("reaches the same result whichever order the duplicates arrive in", () => {
+    const routineDuplicate = {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: DUPLICATE_DESCRIPTION,
+      reason_unverified: "The valve mass is not visible.",
+      verification_kind: "ROUTINE_PRE_USE",
+      required_check: "Competent person to confirm the valve mass.",
+      blocking_before_use: false,
+    };
+
+    const blockingFirst = run({
+      ...duplicateDescriptionOnImminentLift,
+      hazards: [],
+      verification_points: [duplicateDescriptionBlockingPoint, routineDuplicate],
+    }).result;
+    const routineFirst = run({
+      ...duplicateDescriptionOnImminentLift,
+      hazards: [],
+      verification_points: [routineDuplicate, duplicateDescriptionBlockingPoint],
+    }).result;
+
+    for (const result of [blockingFirst, routineFirst]) {
+      expect(result.verification_points).toHaveLength(1);
+      expect(result.verification_points[0].blocking_before_use).toBe(true);
+      expect(result.verification_points[0].verification_kind).toBe("OPERATION_PREREQUISITE");
+      expect(result.overall_status).toBe("HOLD_FOR_VERIFICATION");
+      expect(result.risk_score).toBeNull();
+    }
+  });
+
+  it("does not let a duplicate smuggle blocking status past the guards", () => {
+    const { result } = run({
+      ...duplicateDescriptionOnImminentLift,
+      hazards: [duplicateDescriptionHazard],
+      verification_points: [
+        {
+          ...duplicateDescriptionBlockingPoint,
+          blocking_reason: "The data plate is not legible in this photograph.",
+        },
+      ],
+    });
+
+    expect(result.verification_points).toHaveLength(1);
+    expect(result.verification_points[0].blocking_before_use).toBe(false);
+    expect(result.verification_points[0].blocking_reason).toBeUndefined();
+    expect(result.overall_status).toBe("CONDITIONAL_PASS");
+    expect(result.risk_score).toBe(0);
+  });
+
+  it("does not let a duplicate bypass the operation-context guard", () => {
+    const { result } = run({
+      ...duplicateDescriptionOnImminentLift,
+      operation_context: { state: "STANDALONE_EQUIPMENT", visible_basis: "Valve at rest.", confidence: 90 },
+    });
+
+    expect(result.verification_points).toHaveLength(1);
+    expect(result.verification_points[0].blocking_before_use).toBe(false);
+    expect(result.overall_status).not.toBe("HOLD_FOR_VERIFICATION");
   });
 });
 
