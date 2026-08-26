@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { downloadCsv } from "@/lib/storage";
+import { getCounts, getRiskDisplay, getStatusPresentation } from "@/lib/inspection/view";
 
-const STATUS_LABELS = {
-  PASS: { label: "Pass", cls: "text-pass border-pass/50" },
-  CONDITIONAL_PASS: { label: "Conditional", cls: "text-amber border-amber/50" },
-  CRITICAL_FAIL: { label: "Critical fail", cls: "text-signal border-signal/50" },
+const TONE_CLASSES = {
+  pass: "text-pass border-pass/50",
+  amber: "text-amber border-amber/50",
+  signal: "text-signal border-signal/50",
 };
 
 export default function HistoryView({ audits, onPrint, onDelete, onClearAll }) {
@@ -50,12 +51,15 @@ export default function HistoryView({ audits, onPrint, onDelete, onClearAll }) {
           <option value="ALL">All</option>
           <option value="PASS">Pass</option>
           <option value="CONDITIONAL_PASS">Conditional</option>
+          <option value="HOLD_FOR_VERIFICATION">Hold</option>
           <option value="CRITICAL_FAIL">Critical fail</option>
         </select>
       </div>
 
       {filtered.map((audit) => {
-        const badge = STATUS_LABELS[audit.result?.overall_status] || STATUS_LABELS.CONDITIONAL_PASS;
+        const badge = getStatusPresentation(audit.result?.overall_status);
+        const risk = getRiskDisplay(audit.result);
+        const counts = getCounts(audit.result);
         return (
           <article key={audit.id} className="bg-panel border border-line rounded-lg p-4">
             <div className="flex gap-3">
@@ -70,13 +74,19 @@ export default function HistoryView({ audits, onPrint, onDelete, onClearAll }) {
                   <p className="text-[15px] text-bone truncate">
                     {audit.metadata?.equipmentTag || "Untagged"} · {audit.result?.equipment?.type || audit.metadata?.category}
                   </p>
-                  <span className={`font-display uppercase tracking-[0.1em] text-[11px] border rounded px-2 py-0.5 shrink-0 ${badge.cls}`}>
-                    {badge.label}
+                  <span
+                    className={`font-display uppercase tracking-[0.1em] text-[11px] border rounded px-2 py-0.5 shrink-0 ${
+                      TONE_CLASSES[badge.tone]
+                    }`}
+                  >
+                    {badge.short}
                   </span>
                 </div>
                 <p className="text-sm text-dim truncate">{audit.metadata?.site || "No site recorded"}</p>
                 <p className="font-mono text-[11px] text-dim mt-1">
-                  {audit.signedAt} · risk {audit.result?.risk_score}/100 · {audit.auditRef}
+                  {audit.signedAt} · risk {risk.pending ? risk.display : `${risk.display}/100`} · {counts.hazards} hazard
+                  {counts.hazards === 1 ? "" : "s"}
+                  {counts.verifications > 0 ? ` · ${counts.verifications} to verify` : ""} · {audit.auditRef}
                 </p>
               </div>
             </div>

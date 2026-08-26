@@ -1,8 +1,25 @@
 "use client";
 
+import {
+  getCompliantControls,
+  getCounts,
+  getHazards,
+  getRiskDisplay,
+  getStatusMessage,
+  getStatusPresentation,
+  getVerificationLabel,
+  getVerificationPoints,
+} from "@/lib/inspection/view";
+
 export default function ReportSheet({ photoDataUrl, metadata, result, signatureDataUrl, auditRef, signedAt }) {
   if (!result) return null;
   const critical = result.overall_status === "CRITICAL_FAIL";
+  const hold = result.overall_status === "HOLD_FOR_VERIFICATION";
+  const hazards = getHazards(result);
+  const verificationPoints = getVerificationPoints(result);
+  const controls = getCompliantControls(result);
+  const counts = getCounts(result);
+  const risk = getRiskDisplay(result);
 
   return (
     <div className="report-sheet hidden bg-white text-[#111827] font-body">
@@ -22,13 +39,16 @@ export default function ReportSheet({ photoDataUrl, metadata, result, signatureD
         className={`border-2 rounded p-3 mb-4 ${critical ? "border-[#B91C1C]" : "border-[#111827]"}`}
       >
         <p className="font-display uppercase font-bold text-xl">
-          Result: {result.overall_status.replace("_", " ")}
+          Result: {getStatusPresentation(result.overall_status).label}
           {critical ? " — REMOVE FROM SERVICE" : ""}
+          {hold ? " — DO NOT COMMENCE THE OPERATION" : ""}
         </p>
         <p className="text-sm">
-          Risk index {result.risk_score}/100 · AI confidence {result.confidence}% · {result.hazards?.length ?? 0} hazard(s)
-          identified
+          Risk index {risk.pending ? `${risk.display} (${risk.caption})` : `${risk.display}/100`} · AI confidence{" "}
+          {result.confidence}% · {counts.hazards} visible hazard(s) · {counts.verifications} verification point(s)
+          {counts.blocking > 0 ? ` (${counts.blocking} blocking)` : ""}
         </p>
+        <p className="text-[11px] mt-1">{getStatusMessage(result.overall_status)}</p>
       </div>
 
       <table className="w-full text-sm mb-4 border-collapse">
@@ -38,6 +58,14 @@ export default function ReportSheet({ photoDataUrl, metadata, result, signatureD
           <Row label="Category" value={metadata.category} />
           <Row label="Inspection type" value={metadata.inspectionType} />
           <Row label="Site" value={metadata.site || "—"} />
+          {result.operation_context?.state && (
+            <Row
+              label="Operation context"
+              value={`${result.operation_context.state.replace(/_/g, " ")}${
+                result.operation_context.visible_basis ? ` — ${result.operation_context.visible_basis}` : ""
+              }`}
+            />
+          )}
           <Row
             label="GPS"
             value={metadata.latitude && metadata.longitude ? `${metadata.latitude} N, ${metadata.longitude} W` : "Not recorded"}
@@ -50,10 +78,8 @@ export default function ReportSheet({ photoDataUrl, metadata, result, signatureD
         <img src={photoDataUrl} alt="Inspected equipment" className="w-[55%] border border-[#D1D5DB] rounded mb-4" />
       )}
 
-      <h2 className="font-display uppercase font-semibold text-base border-b border-[#D1D5DB] pb-1 mb-2">
-        Identified hazards
-      </h2>
-      {result.hazards?.length ? (
+      <SectionTitle>Visible hazards</SectionTitle>
+      {hazards.length ? (
         <table className="w-full text-[12px] border-collapse mb-4">
           <thead>
             <tr className="text-left border-b-2 border-[#111827]">
@@ -64,12 +90,15 @@ export default function ReportSheet({ photoDataUrl, metadata, result, signatureD
             </tr>
           </thead>
           <tbody>
-            {result.hazards.map((hazard, i) => (
+            {hazards.map((hazard, i) => (
               <tr key={i} className="border-b border-[#E5E7EB] align-top">
                 <td className="py-1.5 pr-2 font-semibold">{hazard.severity}</td>
                 <td className="py-1.5 pr-2">
                   {hazard.description}
                   {hazard.location ? ` (${hazard.location})` : ""}
+                  {hazard.visible_evidence ? (
+                    <span className="block text-[11px] text-[#6B7280]">Visible evidence: {hazard.visible_evidence}</span>
+                  ) : null}
                 </td>
                 <td className="py-1.5 pr-2 font-mono text-[11px]">{hazard.regulation}</td>
                 <td className="py-1.5">{hazard.action}</td>
@@ -78,17 +107,59 @@ export default function ReportSheet({ photoDataUrl, metadata, result, signatureD
           </tbody>
         </table>
       ) : (
-        <p className="text-sm mb-4">No defects identified from the supplied photograph.</p>
+        <p className="text-sm mb-4">No visible unsafe condition identified from the supplied photograph.</p>
       )}
 
-      {result.compliant_controls?.length > 0 && (
+      {verificationPoints.length > 0 && (
         <>
-          <h2 className="font-display uppercase font-semibold text-base border-b border-[#D1D5DB] pb-1 mb-2">
-            Verified compliant controls
-          </h2>
+          <SectionTitle>Requires physical verification</SectionTitle>
+          <table className="w-full text-[12px] border-collapse mb-4">
+            <thead>
+              <tr className="text-left border-b-2 border-[#111827]">
+                <th className="py-1 pr-2 w-[168px]">Status</th>
+                <th className="py-1 pr-2">Item</th>
+                <th className="py-1">Check required</th>
+              </tr>
+            </thead>
+            <tbody>
+              {verificationPoints.map((point, i) => (
+                <tr key={i} className="border-b border-[#E5E7EB] align-top">
+                  <td className={`py-1.5 pr-2 ${point.blocking_before_use ? "font-semibold" : ""}`}>
+                    {getVerificationLabel(point)}
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    {point.description}
+                    {point.location ? ` (${point.location})` : ""}
+                    {point.reason_unverified ? (
+                      <span className="block text-[11px] text-[#6B7280]">Why: {point.reason_unverified}</span>
+                    ) : null}
+                  </td>
+                  <td className="py-1.5">
+                    {point.required_check}
+                    {point.blocking_before_use && point.blocking_reason ? (
+                      <span className="block text-[11px]">Blocking: {point.blocking_reason}</span>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-[11px] text-[#6B7280] mb-4">
+            Verification points are matters the photograph cannot establish. They are not counted as hazards and do not
+            contribute to the risk index.
+          </p>
+        </>
+      )}
+
+      {controls.length > 0 && (
+        <>
+          <SectionTitle>Verified compliant controls</SectionTitle>
           <ul className="text-sm mb-4 list-disc pl-5">
-            {result.compliant_controls.map((item, i) => (
-              <li key={i}>{item}</li>
+            {controls.map((item, i) => (
+              <li key={i}>
+                {item.description}
+                {item.location ? ` (${item.location})` : ""}
+              </li>
             ))}
           </ul>
         </>
@@ -115,6 +186,12 @@ export default function ReportSheet({ photoDataUrl, metadata, result, signatureD
         PUWER 1998 and LOLER 1998.
       </p>
     </div>
+  );
+}
+
+function SectionTitle({ children }) {
+  return (
+    <h2 className="font-display uppercase font-semibold text-base border-b border-[#D1D5DB] pb-1 mb-2">{children}</h2>
   );
 }
 
