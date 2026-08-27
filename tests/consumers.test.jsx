@@ -44,15 +44,39 @@ const MODEL_REPLY = {
   notes: "Lift appears rigged and about to commence.",
 };
 
+
+/** Build the SSE body the model API returns, so the route is driven through its real transport. */
+function sseStream(text, { stopReason = "end_turn", usage = { output_tokens: 100 }, chunkSize = 40 } = {}) {
+  const events = [`event: message_start\ndata: ${JSON.stringify({ type: "message_start", message: { usage: { input_tokens: 8000 } } })}\n\n`];
+  for (let i = 0; i < text.length; i += chunkSize) {
+    events.push(
+      `event: content_block_delta\ndata: ${JSON.stringify({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: text.slice(i, i + chunkSize) },
+      })}\n\n`
+    );
+  }
+  events.push(
+    `event: message_delta\ndata: ${JSON.stringify({ type: "message_delta", delta: { stop_reason: stopReason }, usage })}\n\n`
+  );
+  events.push(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      for (const event of events) controller.enqueue(encoder.encode(event));
+      controller.close();
+    },
+  });
+}
+
 const realFetch = global.fetch;
 
 /** The result exactly as the route hands it to the browser. */
 async function resultFromRoute(modelReply) {
   process.env.ANTHROPIC_API_KEY = "test-key";
-  global.fetch = async () => ({
-    ok: true,
-    json: async () => ({ content: [{ type: "text", text: JSON.stringify(modelReply) }], stop_reason: "end_turn" }),
-  });
+  global.fetch = async () => ({ ok: true, body: sseStream(JSON.stringify(modelReply)) });
   const { POST } = await import("@/app/api/analyze/route.js");
   const response = await POST({ json: async () => ({ imageBase64: "A", mediaType: "image/jpeg", metadata: {} }) });
   const { result } = await response.json();

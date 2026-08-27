@@ -1,6 +1,8 @@
 import { normaliseInspectionResult } from "@/lib/inspection/validate";
+import { readMessageStream } from "@/lib/inspection/stream";
+import { FUNCTION_BUDGET_SECONDS, UPSTREAM_DEADLINE_MS } from "@/lib/analysis-budget";
 
-export const maxDuration = 60;
+export const maxDuration = FUNCTION_BUDGET_SECONDS;
 
 const SYSTEM_PROMPT = `You are a vision-based hazard screening assistant for a UK competent person carrying out pre-use checks on lifting and work equipment (rigging, forklifts, MEWPs, cranes, slings, shackles, scaffolding, hydraulics, general work equipment).
 
@@ -51,7 +53,9 @@ Analyse the photograph and respond with ONLY a valid JSON object - no markdown, 
 
 Do NOT return overall_status, risk_score or risk_basis. The application calculates the verdict, the risk index and every count deterministically from the evidence you return, and validates each item against the rules below. Your job is the evidence, not the verdict.
 
-Return no more than 8 distinct, evidence-supported hazards. Consolidate duplicate or overlapping findings into a single finding rather than repeating them.
+LENGTH LIMITS - THESE ARE CEILINGS, NEVER TARGETS
+Return no more than 8 distinct, evidence-supported hazards, no more than 6 verification_points, and no more than 6 compliant_controls. Consolidate duplicate or overlapping findings into a single entry rather than repeating them. Where more than 6 verification points would qualify, keep every blocking one and the most safety-significant routine ones.
+Keep every field to a single sentence. description, visible_evidence, reason_unverified, required_check, blocking_reason and each compliant control are one sentence each - specific, not padded. notes is at most two sentences. A concise report is read on site; a long one is not.
 
 NO HAZARD FLOOR - THIS IS THE MOST IMPORTANT RULE
 Eight hazards is a CEILING, never a target and never a floor. A well-engineered scene operating normally may have ZERO, ONE or TWO findings - that is a correct, valuable, trustworthy result, not a failure. Never manufacture findings to fill a quota. If nothing is clearly wrong, say so plainly, with a notes line such as: "No clearly visible defect identified. Operational condition and specialist integrity requirements cannot be verified from this photograph - competent person to confirm." Two honest findings are far more trustworthy than eight padded ones: crying wolf on six uncertainties destroys trust in the two that matter.
@@ -158,7 +162,15 @@ Preferred: "visible", "appears", "not visible", "cannot be confirmed", "requires
 
 FINAL CHECK before responding, verify: every item is in the correct stream and carries its evidence_type; every hazards[] entry has visible_evidence, a precise location and a confidence value; nothing in hazards[] rests on what you cannot see; every blocking_before_use: true passes all four blocking tests and names its prerequisite; no finding rests only on what you cannot see at HIGH or CRITICAL; no finding concerns a subject absent from the image; no normal engineered feature is treated as a defect; if fewer, honest findings would serve better than the number you have, cut; every finding is supported by something visible or clearly labelled as unverified; uncertain conditions are labelled uncertain; every citation is relevant and within the verified set above; legislation, standards and guidance are distinguished; no unsupported numbers remain; severity is proportionate; each corrective action matches its evidence; no compliant_controls entry is contradicted by a finding; the JSON matches exactly the specified shape. If any answer is no, revise before responding.`;
 
-export async function POST(request) {
+/**
+ * The analysis handler. Exported separately from POST so the upstream deadline can
+ * be driven in tests without waiting on the wall clock.
+ *
+ * @param {{ json: () => Promise<any> }} request
+ * @param {{ deadlineMs?: number }} [options]
+ */
+export async function analyse(request, options = {}) {
+  const { deadlineMs = UPSTREAM_DEADLINE_MS } = options;
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -191,11 +203,17 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
+        // The response is long enough that a non-streaming call can idle out
+        // mid-generation. Streaming also lets this route abandon a run that will
+        // not land inside the function budget, while it can still reply in JSON.
+        stream: true,
         // The three-stream contract returns several times more JSON than the
         // single-stream one it replaced. 5000 truncated it mid-object, which
         // reached JSON.parse as a syntax error and failed the whole inspection.
         max_tokens: 16000,
-        system: SYSTEM_PROMPT,
+        // The system prompt is ~5,500 tokens and identical on every request.
+        // Caching it takes that work off the critical path and off the bill.
+        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
         messages: [
           {
             role: "user",
@@ -223,11 +241,28 @@ export async function POST(request) {
       );
     }
 
-    const data = await apiResponse.json();
-    const text = (data.content || [])
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("\n");
+    const data = await readMessageStream(apiResponse.body, { deadlineMs });
+    const text = data.text;
+
+    console.log("[inspect] model response", {
+      chars: text.length,
+      stopReason: data.stop_reason,
+      cacheRead: data.usage?.cache_read_input_tokens ?? 0,
+      cacheWritten: data.usage?.cache_creation_input_tokens ?? 0,
+      outputTokens: data.usage?.output_tokens ?? 0,
+    });
+
+    // Abandoned before the model finished: say so, rather than letting the platform
+    // kill the function and hand the browser an error page it cannot read.
+    if (data.timedOut) {
+      return Response.json(
+        {
+          error:
+            "The analysis did not finish in time. Retake the photo a little closer to the equipment and try again.",
+        },
+        { status: 504 }
+      );
+    }
 
     // A response cut off at the token ceiling is unparseable JSON. Say so plainly:
     // an inspector must never be told a truncated analysis was a network problem.
@@ -281,4 +316,9 @@ export async function POST(request) {
     console.error("analyze route failed", err);
     return Response.json({ error: "Analysis failed. Check the connection and try again." }, { status: 500 });
   }
+}
+
+/** @param {Request} request */
+export async function POST(request) {
+  return analyse(request);
 }
