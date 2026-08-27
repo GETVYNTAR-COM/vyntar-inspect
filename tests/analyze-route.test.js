@@ -32,9 +32,36 @@ const VALVE_LIFT = {
   notes: "Lift appears rigged and about to commence.",
 };
 
+
+/** Build the SSE body the model API returns, so the route is driven through its real transport. */
+function sseStream(text, { stopReason = "end_turn", usage = { output_tokens: 100 }, chunkSize = 40 } = {}) {
+  const events = [`event: message_start\ndata: ${JSON.stringify({ type: "message_start", message: { usage: { input_tokens: 8000 } } })}\n\n`];
+  for (let i = 0; i < text.length; i += chunkSize) {
+    events.push(
+      `event: content_block_delta\ndata: ${JSON.stringify({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: text.slice(i, i + chunkSize) },
+      })}\n\n`
+    );
+  }
+  events.push(
+    `event: message_delta\ndata: ${JSON.stringify({ type: "message_delta", delta: { stop_reason: stopReason }, usage })}\n\n`
+  );
+  events.push(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      for (const event of events) controller.enqueue(encoder.encode(event));
+      controller.close();
+    },
+  });
+}
+
 const upstream = (text, extra = {}) => ({
   ok: true,
-  json: async () => ({ content: [{ type: "text", text }], stop_reason: "end_turn", ...extra }),
+  body: sseStream(text, { stopReason: extra.stop_reason ?? "end_turn" }),
 });
 
 const request = () => ({
@@ -118,6 +145,68 @@ describe("analyze route", () => {
     // A full response carries hazards, verification points and compliant controls,
     // each with per-item evidence fields. 5000 was not enough and truncated it.
     expect(sentBody.max_tokens).toBeGreaterThanOrEqual(16000);
+  });
+
+  it("caches the system prompt and streams the response", async () => {
+    let sent = null;
+    global.fetch = async (_url, init) => {
+      sent = JSON.parse(init.body);
+      return upstream(JSON.stringify(VALVE_LIFT));
+    };
+    await callRoute();
+
+    // The system prompt is the same ~5,500 tokens on every request; caching it
+    // takes that work off the critical path and off the bill. Inspections come in
+    // bursts across a shift, so the entry has to outlive the default five minutes.
+    expect(Array.isArray(sent.system)).toBe(true);
+    expect(sent.system[0].cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(sent.system[0].text.length).toBeGreaterThan(10000);
+
+    // A long response must not be waited for as a single body.
+    expect(sent.stream).toBe(true);
+  });
+
+  it("caps every stream so the response cannot grow without limit", async () => {
+    let sent = null;
+    global.fetch = async (_url, init) => {
+      sent = JSON.parse(init.body);
+      return upstream(JSON.stringify(VALVE_LIFT));
+    };
+    await callRoute();
+
+    const prompt = sent.system[0].text;
+    // Uncapped verification points and compliant controls are what made the
+    // response long enough to exhaust the time budget.
+    expect(prompt).toMatch(/no more than 8 distinct, evidence-supported hazards/);
+    expect(prompt).toMatch(/no more than 6 verification_points/);
+    expect(prompt).toMatch(/no more than 6 compliant_controls/);
+    expect(prompt).toMatch(/single sentence/i);
+  });
+
+  it("answers with an explanation when the model does not finish in time", async () => {
+    const encoder = new TextEncoder();
+    global.fetch = async () => ({
+      ok: true,
+      body: new ReadableStream({
+        async pull(controller) {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify({
+            type: "content_block_delta",
+            index: 0,
+            delta: { type: "text_delta", text: "{" },
+          })}\n\n`));
+        },
+      }),
+    });
+
+    const { analyse } = await import("@/app/api/analyze/route.js");
+    const response = await analyse(request(), { deadlineMs: 20 });
+    const { status, body } = { status: response.status, body: await response.json() };
+
+    expect(status).toBe(504);
+    expect(body.error).toMatch(/did not finish in time/i);
+    expect(body.error).not.toMatch(/connection/i);
+    expect(body.result).toBeUndefined();
   });
 
   it("rejects a response with no JSON in it", async () => {

@@ -14,6 +14,7 @@ import {
   ANALYSIS_UNREADABLE_MESSAGE,
   describeHttpFailure,
 } from "@/lib/analysis-errors";
+import { CLIENT_ABORT_MS } from "@/lib/analysis-budget";
 
 const EMPTY_METADATA = {
   inspector: "",
@@ -80,11 +81,12 @@ export default function Home() {
     setResult(null);
     setSignatureDataUrl(null);
 
-    // The platform aborts the request at 60s with a gateway error page, not JSON.
-    // Stop just short of that so the inspector gets a plain explanation instead of
-    // whatever the browser throws when it tries to read HTML as JSON.
+    // Give up just inside the platform's own limit for the function, so the
+    // inspector gets a plain explanation rather than whatever the browser throws
+    // when it tries to read a gateway error page as JSON. Both ends of this budget
+    // come from one constant so they cannot drift apart.
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 55000);
+    const timeout = setTimeout(() => controller.abort(), CLIENT_ABORT_MS);
 
     try {
       const response = await fetch("/api/analyze", {
