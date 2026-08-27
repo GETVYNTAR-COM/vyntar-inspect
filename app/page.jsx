@@ -9,6 +9,11 @@ import ReportSheet from "@/components/ReportSheet";
 import HistoryView from "@/components/HistoryView";
 import AnalyticsView from "@/components/AnalyticsView";
 import { loadAudits, saveAudit, deleteAudit, clearAudits } from "@/lib/storage";
+import {
+  ANALYSIS_ABORTED_MESSAGE,
+  ANALYSIS_UNREADABLE_MESSAGE,
+  describeHttpFailure,
+} from "@/lib/analysis-errors";
 
 const EMPTY_METADATA = {
   inspector: "",
@@ -74,18 +79,47 @@ export default function Home() {
     setError("");
     setResult(null);
     setSignatureDataUrl(null);
+
+    // The platform aborts the request at 60s with a gateway error page, not JSON.
+    // Stop just short of that so the inspector gets a plain explanation instead of
+    // whatever the browser throws when it tries to read HTML as JSON.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55000);
+
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ imageBase64: photo.base64, mediaType: photo.mediaType, metadata }),
+        signal: controller.signal,
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Analysis failed.");
+
+      // Read as text first: an infrastructure error (timeout, request too large) is
+      // returned as an HTML page, and parsing that as JSON throws a browser-specific
+      // message that tells the inspector nothing.
+      const body = await response.text();
+      let data = null;
+      try {
+        data = body ? JSON.parse(body) : null;
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error || describeHttpFailure(response.status));
+      }
+      if (!data?.result) {
+        throw new Error(ANALYSIS_UNREADABLE_MESSAGE);
+      }
       setResult(data.result);
     } catch (err) {
-      setError(err.message || "Analysis failed. Try again.");
+      if (err?.name === "AbortError") {
+        setError(ANALYSIS_ABORTED_MESSAGE);
+      } else {
+        setError(err?.message || "Analysis failed. Check the connection and try again.");
+      }
     } finally {
+      clearTimeout(timeout);
       setAnalysing(false);
     }
   }
