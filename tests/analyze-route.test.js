@@ -156,9 +156,10 @@ describe("analyze route", () => {
     await callRoute();
 
     // The system prompt is the same ~5,500 tokens on every request; caching it
-    // takes that work off the critical path and off the bill.
+    // takes that work off the critical path and off the bill. Inspections come in
+    // bursts across a shift, so the entry has to outlive the default five minutes.
     expect(Array.isArray(sent.system)).toBe(true);
-    expect(sent.system[0].cache_control).toEqual({ type: "ephemeral" });
+    expect(sent.system[0].cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
     expect(sent.system[0].text.length).toBeGreaterThan(10000);
 
     // A long response must not be waited for as a single body.

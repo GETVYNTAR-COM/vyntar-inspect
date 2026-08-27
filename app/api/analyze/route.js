@@ -213,7 +213,16 @@ export async function analyse(request, options = {}) {
         max_tokens: 16000,
         // The system prompt is ~5,500 tokens and identical on every request.
         // Caching it takes that work off the critical path and off the bill.
-        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+        // Inspectors scan in bursts across a shift, so a 5-minute entry would be
+        // cold for most requests; the 1-hour TTL costs 2x on the write but is read
+        // at ~0.1x, and every read pushes the expiry back another hour.
+        system: [
+          {
+            type: "text",
+            text: SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral", ttl: "1h" },
+          },
+        ],
         messages: [
           {
             role: "user",
