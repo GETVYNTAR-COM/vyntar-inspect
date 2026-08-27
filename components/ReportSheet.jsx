@@ -2,9 +2,8 @@
 
 import {
   getCompliantControls,
-  getCounts,
   getHazards,
-  getRiskDisplay,
+  getResultNarrative,
   getStatusMessage,
   getStatusPresentation,
   getVerificationLabel,
@@ -19,8 +18,6 @@ export default function ReportSheet({ photoDataUrl, metadata, result, signatureD
   const hazards = getHazards(result);
   const verificationPoints = getVerificationPoints(result);
   const controls = getCompliantControls(result);
-  const counts = getCounts(result);
-  const risk = getRiskDisplay(result);
 
   return (
     <div className="report-sheet hidden bg-white text-[#111827] font-body">
@@ -46,9 +43,7 @@ export default function ReportSheet({ photoDataUrl, metadata, result, signatureD
           {hold ? " — DO NOT COMMENCE THE OPERATION" : ""}
         </p>
         <p className="text-sm">
-          Risk index {risk.pending ? `${risk.display} (${risk.caption})` : `${risk.display}/100`} · AI confidence{" "}
-          {result.confidence}% · {counts.hazards} visible hazard(s) · {counts.verifications} verification point(s)
-          {counts.blocking > 0 ? ` (${counts.blocking} blocking)` : ""}
+          {getResultNarrative(result)} AI confidence {result.confidence}%.
         </p>
         <p className="text-[11px] mt-1">{getStatusMessage(result.overall_status)}</p>
       </div>

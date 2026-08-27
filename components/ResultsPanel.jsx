@@ -4,6 +4,7 @@ import {
   getCompliantControls,
   getCounts,
   getHazards,
+  getResultNarrative,
   getRiskDisplay,
   getStatusMessage,
   getVerificationLabel,
@@ -168,6 +169,10 @@ export default function ResultsPanel({ result }) {
         </div>
       )}
 
+      {/* Counts in prose come from the validated result, never from the model's own
+          narrative — those two disagreed on screen ("four blocking" against a header
+          reading three). Any remaining commentary sits beneath, carrying no numbers. */}
+      <p className="text-sm text-dim px-1">{getResultNarrative(result)}</p>
       {result.notes && <p className="text-sm text-dim px-1">{result.notes}</p>}
     </section>
   );

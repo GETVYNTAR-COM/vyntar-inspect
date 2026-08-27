@@ -5,6 +5,7 @@ import ReportSheet from "@/components/ReportSheet";
 import HistoryView from "@/components/HistoryView";
 import AnalyticsView from "@/components/AnalyticsView";
 import { auditsToCsv } from "@/lib/storage";
+import { getResultNarrative } from "@/lib/inspection/view";
 
 /**
  * Every surface that reads an analysis result, driven by a real response taken
@@ -325,5 +326,62 @@ describe("verdict language is proportionate to severity", () => {
     expect(statValue(html, "Critical lockouts")).toBe("0");
     expect(statValue(html, "Fleet pass rate")).toBe("0%");
     expect(html).toMatch(/1 withdrawn pending assessment/i);
+  });
+});
+
+/**
+ * The narrative and the header tiles must be the same numbers. On screen they were
+ * not: the model's notes said "four blocking verification points" beside a header
+ * reading three, because notes is prose written before validation runs.
+ */
+describe("every count in the report comes from the validated result", () => {
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+
+  const withNotes = {
+    ...MODEL_REPLY,
+    notes: "The lift appears rigged and about to commence. There are four blocking verification points to resolve.",
+  };
+
+  it("the model's own counts never reach the screen", async () => {
+    const result = await resultFromRoute(withNotes);
+    const html = renderToStaticMarkup(<ResultsPanel result={result} />);
+
+    expect(html).not.toMatch(/four blocking/i);
+    expect(html).toMatch(/rigged and about to commence/i);
+  });
+
+  it("narrative, header tiles and printed report agree", async () => {
+    const result = await resultFromRoute(withNotes);
+    const narrative = getResultNarrative(result);
+
+    // One blocking point survives validation in this reply, and every surface says so.
+    expect(narrative).toMatch(/2 verification points \(1 blocking\)/);
+    expect(narrative).toMatch(/0 visible hazards/);
+    expect(narrative).toMatch(/risk index —/);
+
+    const panel = renderToStaticMarkup(<ResultsPanel result={result} />);
+    expect(panel).toContain(narrative);
+    expect(statValue(panel, "Visible hazards")).toBe("0");
+    expect(statValue(panel, "Risk index")).toBe("—");
+
+    const report = renderToStaticMarkup(
+      <ReportSheet metadata={{}} result={result} auditRef="VY-1" signedAt="2026-08-27" />
+    );
+    expect(report).toContain(narrative);
+  });
+
+  it("csv columns match the narrative for the same record", async () => {
+    const result = await resultFromRoute(withNotes);
+    const csv = auditsToCsv([{ id: "1", result, metadata: {}, signedAt: "2026-08-27", auditRef: "VY-1" }]);
+    const header = csv.split("\n")[0].split('","').map((c) => c.replace(/^"|"$/g, ""));
+    const row = csv.split("\n")[1].split('","').map((c) => c.replace(/^"|"$/g, ""));
+    const cell = (label) => row[header.indexOf(label)];
+
+    expect(cell("Visible hazards")).toBe("0");
+    expect(cell("Verification points")).toBe("2");
+    expect(cell("Blocking verifications")).toBe("1");
+    expect(getResultNarrative(result)).toMatch(/0 visible hazards, 2 verification points \(1 blocking\)/);
   });
 });
