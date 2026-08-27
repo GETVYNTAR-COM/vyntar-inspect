@@ -22,6 +22,7 @@ export default function ResultsPanel({ result }) {
 
   const status = result.overall_status;
   const critical = status === "CRITICAL_FAIL";
+  const fail = status === "FAIL";
   const hold = status === "HOLD_FOR_VERIFICATION";
   const conditional = status === "CONDITIONAL_PASS";
 
@@ -33,7 +34,8 @@ export default function ResultsPanel({ result }) {
 
   return (
     <section className="space-y-4">
-      {/* Verdict — styled as a physical out-of-service tag when critical */}
+      {/* Verdict. The out-of-service tag is reserved for a visible CRITICAL hazard —
+          a serious-but-not-critical defect withdraws the equipment without condemning it. */}
       {critical ? (
         <div className="hazard-stripe rounded-lg p-1.5">
           <div className="bg-void rounded-md p-4">
@@ -41,6 +43,14 @@ export default function ResultsPanel({ result }) {
             <h2 className="font-display uppercase font-bold text-3xl text-bone leading-none">Critical hazard detected</h2>
             <p className="text-sm text-dim mt-2">{getStatusMessage(status)}</p>
           </div>
+        </div>
+      ) : fail ? (
+        <div className="bg-panel border-2 border-amber rounded-lg p-4">
+          <p className="font-display uppercase tracking-[0.14em] text-amber text-sm mb-1">
+            Withdraw from use — competent person assessment required
+          </p>
+          <h2 className="font-display uppercase font-bold text-3xl text-bone leading-none">Do not use pending assessment</h2>
+          <p className="text-sm text-dim mt-2">{getStatusMessage(status)}</p>
         </div>
       ) : (
         <div className={`bg-panel border rounded-lg p-4 ${hold || conditional ? "border-amber/50" : "border-pass/50"}`}>

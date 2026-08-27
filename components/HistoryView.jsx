@@ -52,6 +52,7 @@ export default function HistoryView({ audits, onPrint, onDelete, onClearAll }) {
           <option value="PASS">Pass</option>
           <option value="CONDITIONAL_PASS">Conditional</option>
           <option value="HOLD_FOR_VERIFICATION">Hold</option>
+          <option value="FAIL">Do not use</option>
           <option value="CRITICAL_FAIL">Critical fail</option>
         </select>
       </div>

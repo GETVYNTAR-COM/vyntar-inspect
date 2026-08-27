@@ -256,3 +256,74 @@ describe("consumers of a real new-shape response", () => {
     expect(() => auditsToCsv([audit])).not.toThrow();
   });
 });
+
+/**
+ * Verdict language must be proportionate to the evidence behind it. A HIGH visible
+ * defect withdraws the equipment; only a CRITICAL one condemns it. The panel put
+ * "STOP — OUT OF SERVICE / CRITICAL HAZARD DETECTED" on a report whose worst
+ * finding was HIGH, which is the failure these cases pin.
+ */
+const HIGH_ONLY_REPLY = {
+  ...MODEL_REPLY,
+  verification_points: [],
+  hazards: [
+    {
+      evidence_type: "VISIBLE_UNSAFE_CONDITION",
+      severity: "HIGH",
+      category: "MECHANICAL",
+      description: "Hook safety latch is bent and no longer closes across the throat",
+      visible_evidence: "The latch is bent outward and stands clear of the hook tip.",
+      location: "Lower hook",
+      action: "Withdraw the sling from use until the latch is replaced.",
+      confidence: 91,
+    },
+  ],
+};
+
+const CRITICAL_REPLY = {
+  ...HIGH_ONLY_REPLY,
+  hazards: [{ ...HIGH_ONLY_REPLY.hazards[0], severity: "CRITICAL" }],
+};
+
+describe("verdict language is proportionate to severity", () => {
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+
+  it("a HIGH hazard withdraws the equipment without condemning it", async () => {
+    const result = await resultFromRoute(HIGH_ONLY_REPLY);
+    expect(result.overall_status).toBe("FAIL");
+    expect(result.risk_score).toBe(65);
+
+    const html = renderToStaticMarkup(<ResultsPanel result={result} />);
+    expect(html).toMatch(/Do not use pending assessment/i);
+    expect(html).not.toMatch(/out of service/i);
+    expect(html).not.toMatch(/Critical hazard detected/i);
+    expect(html).not.toMatch(/Tag out/i);
+
+    const report = renderToStaticMarkup(
+      <ReportSheet metadata={{}} result={result} auditRef="VY-1" signedAt="2026-08-27" />
+    );
+    expect(report).toMatch(/WITHDRAW FROM USE UNTIL ASSESSED/);
+    expect(report).not.toMatch(/REMOVE FROM SERVICE/);
+  });
+
+  it("a CRITICAL hazard still gets the out-of-service tag", async () => {
+    const result = await resultFromRoute(CRITICAL_REPLY);
+    expect(result.overall_status).toBe("CRITICAL_FAIL");
+
+    const html = renderToStaticMarkup(<ResultsPanel result={result} />);
+    expect(html).toMatch(/Stop — out of service/i);
+    expect(html).toMatch(/Critical hazard detected/i);
+  });
+
+  it("fleet analytics does not count a withdrawal as a critical lockout or a pass", async () => {
+    const result = await resultFromRoute(HIGH_ONLY_REPLY);
+    const html = renderToStaticMarkup(
+      <AnalyticsView audits={[{ id: "1", result, metadata: {}, signedAt: "2026-08-27", auditRef: "VY-1" }]} />
+    );
+    expect(statValue(html, "Critical lockouts")).toBe("0");
+    expect(statValue(html, "Fleet pass rate")).toBe("0%");
+    expect(html).toMatch(/1 withdrawn pending assessment/i);
+  });
+});
