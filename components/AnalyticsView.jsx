@@ -9,8 +9,10 @@ export default function AnalyticsView({ audits }) {
     if (total === 0) return null;
 
     const critical = audits.filter((a) => a.result?.overall_status === "CRITICAL_FAIL").length;
+    const fails = audits.filter((a) => a.result?.overall_status === "FAIL").length;
     const holds = audits.filter((a) => a.result?.overall_status === "HOLD_FOR_VERIFICATION").length;
-    const passRate = Math.round(((total - critical - holds) / total) * 1000) / 10;
+    // Withdrawn equipment is not a pass, whether it was condemned or only held back.
+    const passRate = Math.round(((total - critical - fails - holds) / total) * 1000) / 10;
 
     // Records pending physical verification carry no risk number and must not be
     // averaged in as zero — they are excluded from the mean entirely.
@@ -34,7 +36,7 @@ export default function AnalyticsView({ audits }) {
     const ranked = Object.entries(categories).sort((a, b) => b[1].count - a[1].count);
     const maxCount = ranked.length ? ranked[0][1].count : 0;
 
-    return { total, critical, holds, passRate, avgRisk, scoredCount: scored.length, verifications, blocking, ranked, maxCount };
+    return { total, critical, fails, holds, passRate, avgRisk, scoredCount: scored.length, verifications, blocking, ranked, maxCount };
   }, [audits]);
 
   if (!stats) {
@@ -53,7 +55,12 @@ export default function AnalyticsView({ audits }) {
       <div className="grid grid-cols-2 gap-3">
         <Stat label="Fleet pass rate" value={`${stats.passRate}%`} tone={stats.passRate >= 90 ? "pass" : "amber"} />
         <Stat label="Total audits" value={stats.total} />
-        <Stat label="Critical lockouts" value={stats.critical} tone={stats.critical > 0 ? "signal" : "pass"} />
+        <Stat
+          label="Critical lockouts"
+          value={stats.critical}
+          caption={stats.fails > 0 ? `${stats.fails} withdrawn pending assessment` : null}
+          tone={stats.critical > 0 ? "signal" : "pass"}
+        />
         <Stat label="Holds for verification" value={stats.holds} tone={stats.holds > 0 ? "amber" : "pass"} />
         <Stat
           label="Avg risk index"

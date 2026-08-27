@@ -406,3 +406,150 @@ export const duplicateDescriptionOnImminentLift = {
   compliant_controls: [],
   notes: "Lift appears rigged and about to commence.",
 };
+
+/**
+ * The live acceptance failure on the valve-lift photograph.
+ *
+ * Reported as CRITICAL_FAIL — "STOP — OUT OF SERVICE / CRITICAL HAZARD DETECTED" —
+ * with no CRITICAL hazard anywhere in it: one HIGH housekeeping finding (a coiled
+ * rope on the deck) and one LOW administrative finding (the declared category).
+ * Between them they drove the risk index to 67 and the verdict to condemnation.
+ *
+ * Both findings are stated with full, positive visible evidence and high
+ * confidence, so every pre-existing guard passes them. Only the scope rules
+ * catch them.
+ */
+export const valveLiftHousekeepingAndCategory = {
+  equipment: { type: "Gate valve rigged for lifting", category: "Lifting operation", model_estimate: "" },
+  operation_context: {
+    state: "OPERATION_IMMINENT",
+    visible_basis: "Valve rigged to a hook block with slings taut and workers standing clear.",
+    confidence: 85,
+  },
+  confidence: 82,
+  hazards: [
+    {
+      evidence_type: "VISIBLE_UNSAFE_CONDITION",
+      severity: "HIGH",
+      category: "MECHANICAL",
+      description: "Coiled rope on the deck creating a trip hazard in the work area",
+      visible_evidence: "A rope is coiled on the deck in the foreground of the working area.",
+      location: "Deck, foreground left",
+      action: "Clear the rope from the working area before the lift.",
+      confidence: 88,
+    },
+    {
+      evidence_type: "VISIBLE_UNSAFE_CONDITION",
+      severity: "LOW",
+      category: "OPERATIONAL",
+      description: "Declared category does not appear to match the photographed equipment",
+      visible_evidence: "The photograph shows a rigged gate valve; the declared category is Forklift.",
+      location: "Whole image",
+      action: "Confirm the correct category is selected before signing this record.",
+      confidence: 90,
+    },
+  ],
+  verification_points: [
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Sling and hook-block identification, WLL/SWL and current examination status for this lift",
+      reason_unverified: "Identification and examination status cannot be established from the photograph.",
+      verification_kind: "OPERATION_PREREQUISITE",
+      required_check: "Confirm identification, WLL/SWL and in-date thorough examination for every accessory in this lift.",
+      blocking_before_use: true,
+      blocking_reason:
+        "The rated capacity and current examination status of the assembled rigging are mandatory prerequisites for this lift and cannot be established from the image.",
+    },
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Valve mass against the lift plan and lifting-accessory capacity",
+      reason_unverified: "The valve mass is not marked or visible.",
+      verification_kind: "OPERATION_PREREQUISITE",
+      required_check: "Confirm the valve mass against the lift plan and the rated capacity of every accessory.",
+      blocking_before_use: true,
+      blocking_reason:
+        "The load mass must be matched to the lift plan and accessory capacity before hoisting and cannot be established from the image.",
+    },
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Sling-leg configuration and working-angle capacity before hoisting",
+      reason_unverified: "The included angle cannot be measured from a single photograph.",
+      verification_kind: "OPERATION_PREREQUISITE",
+      required_check: "Confirm the sling angle and the derated capacity of the configuration before hoisting.",
+      blocking_before_use: true,
+      blocking_reason:
+        "The sling angle determines the derated capacity of this rigging configuration and cannot be measured from the image.",
+    },
+  ],
+  compliant_controls: [
+    { evidence_type: "VISIBLE_COMPLIANT_CONTROL", description: "Workers wearing hard hats" },
+    { evidence_type: "VISIBLE_COMPLIANT_CONTROL", description: "Workers positioned outside the suspended-load area" },
+  ],
+  notes: "Lift appears rigged and about to commence.",
+};
+
+/** Scene furniture stated without housekeeping vocabulary: object plus placement alone. */
+export const scaffoldPlanksStackedOnDeck = {
+  equipment: { type: "Mobile access tower", category: "Access equipment", model_estimate: "" },
+  operation_context: { state: "STANDALONE_EQUIPMENT", visible_basis: "Tower photographed at rest.", confidence: 80 },
+  confidence: 80,
+  hazards: [
+    {
+      evidence_type: "VISIBLE_UNSAFE_CONDITION",
+      severity: "HIGH",
+      category: "STRUCTURAL",
+      description: "Timber planks stacked on the ground beside the tower",
+      visible_evidence: "A stack of timber planks is lying on the ground beside the tower base.",
+      location: "Ground, right of the tower",
+      action: "Move the planks clear.",
+      confidence: 85,
+    },
+  ],
+  verification_points: [],
+  compliant_controls: [],
+  notes: "",
+};
+
+/** A genuine load-path defect worded with placement language must survive the scope rules. */
+export const frayedSlingLyingOnDeck = {
+  equipment: { type: "Wire rope sling", category: "Lifting accessory", model_estimate: "" },
+  operation_context: { state: "STANDALONE_EQUIPMENT", visible_basis: "Sling photographed on the deck.", confidence: 84 },
+  confidence: 84,
+  hazards: [
+    {
+      evidence_type: "VISIBLE_UNSAFE_CONDITION",
+      severity: "CRITICAL",
+      category: "MECHANICAL",
+      description: "Frayed wire rope sling lying on the deck",
+      visible_evidence: "Multiple broken wires and a birdcaged section are visible along the sling body.",
+      location: "Mid-span of the sling",
+      action: "Quarantine the sling and remove it from service.",
+      confidence: 92,
+    },
+  ],
+  verification_points: [],
+  compliant_controls: [],
+  notes: "",
+};
+
+/** A hose defect in the equipment itself, worded with placement language. */
+export const chafedHydraulicHoseOnPowerPack = {
+  equipment: { type: "Hydraulic power pack", category: "Work equipment", model_estimate: "" },
+  operation_context: { state: "STANDALONE_EQUIPMENT", visible_basis: "Power pack photographed at rest.", confidence: 85 },
+  confidence: 85,
+  hazards: [
+    {
+      evidence_type: "VISIBLE_UNSAFE_CONDITION",
+      severity: "HIGH",
+      category: "HYDRAULIC",
+      description: "Hydraulic hose is chafed where it runs on the ground beneath the frame",
+      visible_evidence: "The outer cover of the hose is worn through and the reinforcement braid is exposed.",
+      location: "Beneath the frame, front left",
+      action: "Withdraw the unit from use until the hose is replaced.",
+      confidence: 88,
+    },
+  ],
+  verification_points: [],
+  compliant_controls: [],
+  notes: "",
+};

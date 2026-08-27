@@ -14,6 +14,7 @@ import {
 export default function ReportSheet({ photoDataUrl, metadata, result, signatureDataUrl, auditRef, signedAt }) {
   if (!result) return null;
   const critical = result.overall_status === "CRITICAL_FAIL";
+  const fail = result.overall_status === "FAIL";
   const hold = result.overall_status === "HOLD_FOR_VERIFICATION";
   const hazards = getHazards(result);
   const verificationPoints = getVerificationPoints(result);
@@ -41,6 +42,7 @@ export default function ReportSheet({ photoDataUrl, metadata, result, signatureD
         <p className="font-display uppercase font-bold text-xl">
           Result: {getStatusPresentation(result.overall_status).label}
           {critical ? " — REMOVE FROM SERVICE" : ""}
+          {fail ? " — WITHDRAW FROM USE UNTIL ASSESSED" : ""}
           {hold ? " — DO NOT COMMENCE THE OPERATION" : ""}
         </p>
         <p className="text-sm">
