@@ -191,7 +191,10 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 5000,
+        // The three-stream contract returns several times more JSON than the
+        // single-stream one it replaced. 5000 truncated it mid-object, which
+        // reached JSON.parse as a syntax error and failed the whole inspection.
+        max_tokens: 16000,
         system: SYSTEM_PROMPT,
         messages: [
           {
@@ -226,6 +229,16 @@ export async function POST(request) {
       .map((block) => block.text)
       .join("\n");
 
+    // A response cut off at the token ceiling is unparseable JSON. Say so plainly:
+    // an inspector must never be told a truncated analysis was a network problem.
+    if (data.stop_reason === "max_tokens") {
+      console.error("[inspect] model output truncated at max_tokens", { chars: text.length });
+      return Response.json(
+        { error: "The analysis was cut off before it finished. Retake the photo and try again." },
+        { status: 502 }
+      );
+    }
+
     const cleaned = text.replace(/```json|```/g, "").trim();
     const firstBrace = cleaned.indexOf("{");
     const lastBrace = cleaned.lastIndexOf("}");
@@ -233,7 +246,22 @@ export async function POST(request) {
       return Response.json({ error: "Could not read the analysis result. Try again." }, { status: 502 });
     }
 
-    const raw = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+    let raw;
+    try {
+      raw = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+    } catch (parseError) {
+      // Malformed model output is an upstream content failure, not a transport
+      // failure, and must never reach the browser as an unparsed body.
+      console.error("[inspect] model output was not valid JSON", {
+        chars: cleaned.length,
+        stopReason: data.stop_reason,
+        message: parseError?.message,
+      });
+      return Response.json(
+        { error: "The analysis came back incomplete. Retake the photo and try again." },
+        { status: 502 }
+      );
+    }
 
     // The model proposes evidence; the validator decides. Status, risk and every
     // count below come from here, not from the model response.
