@@ -553,3 +553,104 @@ export const chafedHydraulicHoseOnPowerPack = {
   compliant_controls: [],
   notes: "",
 };
+
+/**
+ * The second live failure on the valve-lift photograph.
+ *
+ * The rope came back as MEDIUM inside hazards[] with conditional wording — the
+ * severity guards had downgraded it from HIGH instead of moving it out, and the
+ * phrase "planned rigging" matched the load-path exemption, so the scope rules
+ * let it through. The notes then stated four blocking verification points while
+ * the header, counting the validated result, showed three.
+ */
+export const valveLiftHypotheticalRope = {
+  equipment: { type: "Gate valve rigged for lifting", category: "Lifting operation", model_estimate: "" },
+  operation_context: {
+    state: "OPERATION_IMMINENT",
+    visible_basis: "Valve rigged to a hook block with slings taut and workers standing clear.",
+    confidence: 85,
+  },
+  confidence: 82,
+  hazards: [
+    {
+      evidence_type: "VISIBLE_UNSAFE_CONDITION",
+      severity: "MEDIUM",
+      category: "OPERATIONAL",
+      description: "Loose rope on the deck which, if not part of the planned rigging, could become a trip hazard",
+      visible_evidence: "A rope runs across the deck beside the valve.",
+      location: "Deck, foreground left",
+      action: "Confirm whether the rope forms part of the lift and clear it otherwise.",
+      confidence: 76,
+    },
+  ],
+  verification_points: [
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Valve mass against the lift plan and lifting-accessory capacity",
+      reason_unverified: "The valve mass is not marked or visible.",
+      verification_kind: "OPERATION_PREREQUISITE",
+      required_check: "Confirm the valve mass against the lift plan and the rated capacity of every accessory.",
+      blocking_before_use: true,
+      blocking_reason:
+        "The load mass must be matched to the lift plan and accessory capacity before hoisting and cannot be established from the image.",
+    },
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Sling-leg configuration and working-angle capacity before hoisting",
+      reason_unverified: "The included angle cannot be measured from a single photograph.",
+      verification_kind: "OPERATION_PREREQUISITE",
+      required_check: "Confirm the sling angle and the derated capacity of the configuration before hoisting.",
+      blocking_before_use: true,
+      blocking_reason:
+        "The sling angle determines the derated capacity of this rigging configuration and cannot be measured from the image.",
+    },
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Sling and hook-block identification, WLL/SWL and current examination status for this lift",
+      reason_unverified: "Identification and examination status cannot be established from the photograph.",
+      verification_kind: "OPERATION_PREREQUISITE",
+      required_check: "Confirm identification, WLL/SWL and in-date thorough examination for every accessory in this lift.",
+      blocking_before_use: true,
+      blocking_reason:
+        "The rated capacity and current examination status of the assembled rigging are mandatory prerequisites for this lift and cannot be established from the image.",
+    },
+    {
+      // A fourth blocking claim the validator refuses: the operation prerequisite is
+      // never named, which is how the model's "four" and the header's "three" parted.
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "General condition of the valve body",
+      reason_unverified: "Surface condition cannot be assessed at this resolution.",
+      verification_kind: "ROUTINE_PRE_USE",
+      required_check: "Competent person to inspect the valve body before the lift.",
+      blocking_before_use: true,
+      blocking_reason: "The valve body should be looked at.",
+    },
+  ],
+  compliant_controls: [
+    { evidence_type: "VISIBLE_COMPLIANT_CONTROL", description: "Workers wearing hard hats" },
+  ],
+  notes:
+    "The lift appears rigged and about to commence. There are four blocking verification points and one hazard to resolve before hoisting.",
+};
+
+/** Conditional wording wrapped around a defect that is genuinely visible. */
+export const crackedWeldDescribedWithHedge = {
+  equipment: { type: "Lifting beam", category: "Lifting equipment", model_estimate: "" },
+  operation_context: { state: "STANDALONE_EQUIPMENT", visible_basis: "Beam on stands.", confidence: 86 },
+  confidence: 86,
+  hazards: [
+    {
+      evidence_type: "VISIBLE_UNSAFE_CONDITION",
+      severity: "CRITICAL",
+      category: "STRUCTURAL",
+      description: "Cracked weld at the padeye, which could fail under load",
+      visible_evidence: "A crack runs through the fillet weld at the base of the padeye.",
+      location: "Padeye, left end",
+      action: "Quarantine the beam and remove it from service.",
+      confidence: 90,
+    },
+  ],
+  verification_points: [],
+  compliant_controls: [],
+  notes: "",
+};

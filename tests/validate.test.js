@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normaliseInspectionResult, resolveRisk, resolveStatus } from "@/lib/inspection/validate";
+import { normaliseInspectionResult, resolveRisk, resolveStatus, stripCountClaims } from "@/lib/inspection/validate";
 import { getStatusMessage, getStatusPresentation } from "@/lib/inspection/view";
 import {
   DUPLICATE_DESCRIPTION,
@@ -21,6 +21,8 @@ import {
   scaffoldPlanksStackedOnDeck,
   frayedSlingLyingOnDeck,
   chafedHydraulicHoseOnPowerPack,
+  valveLiftHypotheticalRope,
+  crackedWeldDescribedWithHedge,
 } from "./fixtures.js";
 
 const run = (fixture) => normaliseInspectionResult(fixture);
@@ -479,5 +481,97 @@ describe("valve-lift acceptance photograph", () => {
     const { result } = run(valveLiftHousekeepingAndCategory);
     expect(getStatusMessage(result.overall_status)).not.toMatch(/tag out|out of service|remove from operation/i);
     expect(getStatusPresentation(result.overall_status).label).toBe("Hold for verification");
+  });
+});
+
+describe("housekeeping is moved, never downgraded", () => {
+  // Regression: the rope came back MEDIUM inside hazards[] rather than being moved.
+  // Two things let it through — the severity guards downgrade rather than relocate,
+  // and "planned rigging" matched the load-path exemption.
+  it("removes a housekeeping finding from hazards[] entirely", () => {
+    const { result } = run(valveLiftHypotheticalRope);
+
+    // Absence, not a reduced severity: no rope entry at ANY severity.
+    expect(result.hazards).toHaveLength(0);
+    expect(result.hazards.some((hazard) => /rope/i.test(hazard.description))).toBe(false);
+    expect(result.hazards.some((hazard) => hazard.severity === "MEDIUM")).toBe(false);
+
+    const rope = result.verification_points.find((point) => /rope/i.test(point.description));
+    expect(rope).toBeDefined();
+    expect(rope.evidence_type).toBe("VERIFICATION_REQUIRED");
+    expect(rope.blocking_before_use).toBe(false);
+    expect(rope.severity).toBeUndefined();
+
+    // And nothing it contributed survives in the numbers.
+    expect(result.risk_score).toBeNull();
+    expect(result.overall_status).toBe("HOLD_FOR_VERIFICATION");
+  });
+
+  it("does not let a mention of rigging rescue a trip hazard", () => {
+    const { changes } = run(valveLiftHypotheticalRope);
+    expect(changes.some((entry) => /moved to verification/i.test(entry))).toBe(true);
+  });
+
+  it("relocates a conditional finding with no visible defect behind it", () => {
+    const { result } = run({
+      ...valveLiftHypotheticalRope,
+      hazards: [
+        {
+          evidence_type: "VISIBLE_UNSAFE_CONDITION",
+          severity: "MEDIUM",
+          category: "MECHANICAL",
+          description: "The shackle pin may not be fully seated",
+          visible_evidence: "The pin head is visible at the side of the bow.",
+          location: "Shackle bow",
+          action: "Check the pin.",
+          confidence: 80,
+        },
+      ],
+    });
+
+    expect(result.hazards).toHaveLength(0);
+    const moved = result.verification_points.find((point) => /shackle pin/i.test(point.description));
+    expect(moved).toBeDefined();
+    expect(moved.blocking_before_use).toBe(false);
+  });
+
+  it("keeps a visible defect that happens to be described with a hedge", () => {
+    const { result } = run(crackedWeldDescribedWithHedge);
+    expect(result.hazards).toHaveLength(1);
+    expect(result.hazards[0].severity).toBe("CRITICAL");
+    expect(result.overall_status).toBe("CRITICAL_FAIL");
+    expect(result.risk_score).toBe(98);
+  });
+});
+
+describe("counts are never stated twice", () => {
+  // Regression: notes said "four blocking verification points" beside a header
+  // reading three, because notes is written before validation runs.
+  it("removes the model's own counts from the notes prose", () => {
+    const { result, changes } = run(valveLiftHypotheticalRope);
+
+    expect(result.notes).not.toMatch(/four/i);
+    expect(result.notes).not.toMatch(/blocking verification points/i);
+    expect(result.notes).toMatch(/rigged and about to commence/i);
+    expect(changes.some((entry) => /notes: removed a sentence stating its own counts/.test(entry))).toBe(true);
+  });
+
+  it("counts the validated result, not what the model proposed", () => {
+    const { result } = run(valveLiftHypotheticalRope);
+    // The model claimed four blocking points; one named no prerequisite and lost
+    // its blocking status, so the answer is three.
+    expect(result.verification_points.filter((point) => point.blocking_before_use)).toHaveLength(3);
+  });
+
+  it("leaves qualitative prose carrying no numbers alone", () => {
+    const notes = "No clearly visible defect identified. Competent person to confirm on site.";
+    expect(stripCountClaims(notes)).toBe(notes);
+  });
+
+  it("strips only the sentence that carries the count", () => {
+    const stripped = stripCountClaims("Lift is rigged. Three hazards were identified. Inspect before hoisting.");
+    expect(stripped).toMatch(/Lift is rigged/);
+    expect(stripped).toMatch(/Inspect before hoisting/);
+    expect(stripped).not.toMatch(/Three hazards/i);
   });
 });
