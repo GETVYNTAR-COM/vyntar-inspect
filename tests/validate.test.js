@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { normaliseInspectionResult, resolveRisk, resolveStatus, stripCountClaims } from "@/lib/inspection/validate";
-import { getStatusMessage, getStatusPresentation } from "@/lib/inspection/view";
+import {
+  isLoadVisiblySuspended,
+  normaliseInspectionResult,
+  resolveRisk,
+  resolveStatus,
+  stripCountClaims,
+} from "@/lib/inspection/validate";
+import { getHoldInstruction, getStatusMessage, getStatusPresentation } from "@/lib/inspection/view";
 import {
   DUPLICATE_DESCRIPTION,
+  beamClampsMisreadAsOverheadCrane,
   bentHookLatch,
+  chainBlocksOnBeamClamps,
   cleanChainSlingUnreadableTag,
   cleanEquipmentVisibleIdentification,
   cosmeticPaintWear,
@@ -573,5 +581,178 @@ describe("counts are never stated twice", () => {
     expect(stripped).toMatch(/Lift is rigged/);
     expect(stripped).toMatch(/Inspect before hoisting/);
     expect(stripped).not.toMatch(/Three hazards/i);
+  });
+});
+
+/**
+ * 16 September 2026 field correction. Chain blocks hung from beam clamps came back
+ * as an "overhead travelling crane", so no clamp check was ever asked and visible
+ * side loading of the clamps went unreported. A Lifting Authority caught it on sight.
+ */
+describe("suspended-load escalation", () => {
+  it("reads a load off the ground from the operation context, not from the state alone", () => {
+    const active = { state: "OPERATION_ACTIVE", visible_basis: "Load suspended clear of the deck.", confidence: 86 };
+    expect(isLoadVisiblySuspended(active)).toBe(true);
+
+    // Work under way with nothing in the air is not a suspended load.
+    expect(
+      isLoadVisiblySuspended({ ...active, visible_basis: "An operative is greasing the hoist body." })
+    ).toBe(false);
+    // An imminent lift has not picked the load up yet.
+    expect(isLoadVisiblySuspended({ ...active, state: "OPERATION_IMMINENT" })).toBe(false);
+    // And the same confidence floor applies as to any other hold.
+    expect(isLoadVisiblySuspended({ ...active, confidence: 55 })).toBe(false);
+  });
+
+  it("makes rigging configuration, attachment points and the exclusion zone blocking", () => {
+    const { result, changes } = run(chainBlocksOnBeamClamps);
+
+    const blocking = result.verification_points.filter((point) => point.blocking_before_use === true);
+    const descriptions = blocking.map((point) => point.description).join(" | ");
+    expect(descriptions).toMatch(/load sharing/i);
+    expect(descriptions).toMatch(/fit to the beam flange/i);
+    expect(descriptions).toMatch(/exclusion zone/i);
+
+    for (const point of blocking) {
+      expect(point.verification_kind).toBe("OPERATION_PREREQUISITE");
+      expect(point.blocking_reason).toBeTruthy();
+    }
+    expect(changes.filter((entry) => /escalated to a hold point/.test(entry))).toHaveLength(3);
+  });
+
+  it("leaves a routine check that is not one of the three alone", () => {
+    const { result } = run(chainBlocksOnBeamClamps);
+    const tags = result.verification_points.find((point) => /identification tags/i.test(point.description));
+    expect(tags.blocking_before_use).toBe(false);
+    expect(tags.verification_kind).toBe("ROUTINE_PRE_USE");
+  });
+
+  it("escalates nothing while the load is still on the ground", () => {
+    const { result, changes } = run({
+      ...chainBlocksOnBeamClamps,
+      operation_context: {
+        state: "OPERATION_IMMINENT",
+        visible_basis: "Chain blocks rigged to the load, which is still standing on the deck.",
+        confidence: 86,
+      },
+    });
+    expect(changes.some((entry) => /escalated to a hold point/.test(entry))).toBe(false);
+    const escalatable = result.verification_points.filter((point) =>
+      /load sharing|beam flange|exclusion zone/i.test(point.description)
+    );
+    expect(escalatable).toHaveLength(3);
+    expect(escalatable.every((point) => point.blocking_before_use === false)).toBe(true);
+  });
+});
+
+describe("compliant controls cannot outrank a verification point", () => {
+  it("removes a control covering a matter the report says cannot be verified", () => {
+    const { result, changes } = run(chainBlocksOnBeamClamps);
+    const descriptions = result.compliant_controls.map((control) => control.description);
+
+    // The report asks for the tags to be read and for the exclusion zone to be
+    // confirmed. It cannot also present either as a control already satisfied.
+    expect(descriptions.some((entry) => /identification tag/i.test(entry))).toBe(false);
+    expect(descriptions.some((entry) => /exclusion zone/i.test(entry))).toBe(false);
+    expect(descriptions).toContain("Operatives wearing hard hats");
+    expect(changes.filter((entry) => /compliant control .*removed/.test(entry))).toHaveLength(2);
+  });
+
+  it("strips a colour-coding tag offered as proof the equipment is in date", () => {
+    const { result } = run(beamClampsMisreadAsOverheadCrane);
+    expect(result.compliant_controls.some((control) => /colour-coding tag/i.test(control.description))).toBe(false);
+  });
+
+  it("keeps controls on subjects nothing in the report questions", () => {
+    const { result } = run(riggedLiftPrerequisitesUnresolved);
+    expect(result.compliant_controls).toHaveLength(5);
+  });
+
+  it("keeps every control when the report raises nothing at all", () => {
+    const { result } = run(cleanEquipmentVisibleIdentification);
+    expect(result.compliant_controls).toHaveLength(1);
+  });
+});
+
+describe("hold wording follows the operation context", () => {
+  it("tells a crew with a load in the air to stop, not to refrain from starting", () => {
+    const { result } = run(chainBlocksOnBeamClamps);
+    expect(result.overall_status).toBe("HOLD_FOR_VERIFICATION");
+
+    const message = getStatusMessage(result.overall_status, result.operation_context);
+    expect(message).toMatch(/STOP \/ HOLD THE OPERATION — do not continue/);
+    expect(message).not.toMatch(/do not commence/i);
+    expect(getHoldInstruction(result.operation_context)).toBe("STOP / HOLD THE OPERATION — DO NOT CONTINUE");
+  });
+
+  it("keeps 'do not commence' for an operation that has not started", () => {
+    const { result } = run(riggedLiftPrerequisitesUnresolved);
+    expect(result.operation_context.state).toBe("OPERATION_IMMINENT");
+    expect(getStatusMessage(result.overall_status, result.operation_context)).toMatch(/Do not commence the operation/);
+    expect(getHoldInstruction(result.operation_context)).toBe("DO NOT COMMENCE THE OPERATION");
+  });
+
+  it("changes nothing for any other verdict", () => {
+    const { result } = run(chainBlocksOnBeamClamps);
+    const active = result.operation_context;
+    expect(getStatusMessage("CRITICAL_FAIL", active)).toBe(getStatusMessage("CRITICAL_FAIL"));
+    expect(getStatusMessage("FAIL", active)).toBe(getStatusMessage("FAIL"));
+    expect(getStatusMessage("PASS", active)).toBe(getStatusMessage("PASS"));
+  });
+});
+
+describe("beam-clamp acceptance photograph", () => {
+  it("names the arrangement from what is visible and never claims a crane", () => {
+    const { result } = run(chainBlocksOnBeamClamps);
+    expect(result.equipment.type).toMatch(/chain block/i);
+    expect(result.equipment.type).toMatch(/clamp/i);
+    expect(result.equipment.type).not.toMatch(/crane|gantry|runway/i);
+  });
+
+  it("raises the side loading as a visible concern carrying an angle verification", () => {
+    const { result } = run(chainBlocksOnBeamClamps);
+
+    const sideLoading = result.hazards.find((hazard) => /side loading|away from the vertical/i.test(hazard.description));
+    expect(sideLoading).toBeDefined();
+    expect(sideLoading.evidence_type).toBe("VISIBLE_UNSAFE_CONDITION");
+    expect(sideLoading.visible_evidence).toBeTruthy();
+    expect(sideLoading.location).toBeTruthy();
+
+    const angle = result.verification_points.find((point) => /permitted angle/i.test(point.description));
+    expect(angle).toBeDefined();
+    expect(angle.blocking_before_use).toBe(true);
+    expect(angle.required_check).toMatch(/manufacturer/i);
+    expect(angle.required_check).toMatch(/wll/i);
+  });
+
+  it("holds the operation, invents no defect and puts no number against the hold", () => {
+    const { result } = run(chainBlocksOnBeamClamps);
+
+    expect(result.overall_status).toBe("HOLD_FOR_VERIFICATION");
+    expect(result.risk_score).toBeNull();
+    expect(result.risk_basis).toBe("INSUFFICIENT_EVIDENCE");
+
+    // One finding, and it is the one the Lifting Authority made.
+    expect(result.hazards).toHaveLength(1);
+    expect(result.hazards[0].severity).toBe("MEDIUM");
+    expect(result.verification_points.filter((point) => point.blocking_before_use)).toHaveLength(4);
+  });
+
+  it("asks every clamp question the crane misidentification suppressed", () => {
+    const { result } = run(chainBlocksOnBeamClamps);
+    const prose = result.verification_points
+      .map((point) => `${point.description} ${point.required_check}`)
+      .join(" | ");
+
+    expect(prose).toMatch(/clamp type|type, rated wll/i); // device type
+    expect(prose).toMatch(/wll/i); // rated capacity
+    expect(prose).toMatch(/fit(?:ted)? to the (?:beam )?flange/i); // fit to the member
+    expect(prose).toMatch(/angle of loading/i); // line of force
+  });
+
+  it("does not confirm the arrangement above the clamps", () => {
+    const { result } = run(chainBlocksOnBeamClamps);
+    expect(result.notes).toMatch(/cannot be confirmed from this photograph/i);
+    expect(result.compliant_controls.some((control) => /connected to a single/i.test(control.description))).toBe(false);
   });
 });

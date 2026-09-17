@@ -6,6 +6,7 @@ import HistoryView from "@/components/HistoryView";
 import AnalyticsView from "@/components/AnalyticsView";
 import { auditsToCsv } from "@/lib/storage";
 import { getResultNarrative } from "@/lib/inspection/view";
+import { chainBlocksOnBeamClamps } from "./fixtures.js";
 
 /**
  * Every surface that reads an analysis result, driven by a real response taken
@@ -179,6 +180,28 @@ describe("consumers of a real new-shape response", () => {
     expect(html).toMatch(/DO NOT COMMENCE THE OPERATION/);
     expect(html).toMatch(/Pending physical verification/i);
     expect(html).not.toMatch(/Risk index 0/);
+  });
+
+  it("printed report and panel say STOP while the load is in the air", async () => {
+    const suspended = await resultFromRoute(chainBlocksOnBeamClamps);
+    expect(suspended.overall_status).toBe("HOLD_FOR_VERIFICATION");
+
+    const report = renderToStaticMarkup(
+      <ReportSheet
+        photoDataUrl={null}
+        metadata={auditFor(suspended).metadata}
+        result={suspended}
+        signatureDataUrl={null}
+        auditRef="VYN-29ADAA389D7217DF"
+        signedAt="16/09/2026"
+      />
+    );
+    expect(report).toMatch(/STOP \/ HOLD THE OPERATION/);
+    expect(report).not.toMatch(/DO NOT COMMENCE/i);
+
+    const panel = renderToStaticMarkup(<ResultsPanel result={suspended} />);
+    expect(panel).toMatch(/STOP \/ HOLD THE OPERATION/);
+    expect(panel).not.toMatch(/do not commence/i);
   });
 
   it("audit history renders a held record", () => {

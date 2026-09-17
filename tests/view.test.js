@@ -4,6 +4,7 @@ import {
   getCompliantControls,
   getCounts,
   getHazards,
+  getHoldInstruction,
   getRiskDisplay,
   getRiskExportValue,
   getStatusMessage,
@@ -69,6 +70,35 @@ describe("status presentation", () => {
     expect(getStatusMessage("HOLD_FOR_VERIFICATION")).not.toMatch(/remain in service/i);
     expect(getStatusMessage("HOLD_FOR_VERIFICATION")).toMatch(/Do not commence the operation/i);
     expect(getStatusMessage("CONDITIONAL_PASS")).toMatch(/competent person confirms it is safe/i);
+  });
+
+  // A crew with a load in the air cannot "not commence": the lift has started. Told
+  // to refrain from starting, the only reading left is to finish and then check.
+  it("tells an operation already under way to stop rather than not to start", () => {
+    const active = { state: "OPERATION_ACTIVE", visible_basis: "Load suspended clear of the deck.", confidence: 86 };
+
+    expect(getStatusMessage("HOLD_FOR_VERIFICATION", active)).toMatch(/STOP \/ HOLD THE OPERATION — do not continue/);
+    expect(getStatusMessage("HOLD_FOR_VERIFICATION", active)).not.toMatch(/do not commence/i);
+    expect(getHoldInstruction(active)).toBe("STOP / HOLD THE OPERATION — DO NOT CONTINUE");
+  });
+
+  it("keeps the pre-start wording for every state that has not started", () => {
+    for (const state of ["STANDALONE_EQUIPMENT", "ASSEMBLED_NOT_IMMINENT", "OPERATION_IMMINENT", "UNKNOWN"]) {
+      const context = { state, visible_basis: "", confidence: 86 };
+      expect(getStatusMessage("HOLD_FOR_VERIFICATION", context)).toMatch(/Do not commence the operation/);
+      expect(getHoldInstruction(context)).toBe("DO NOT COMMENCE THE OPERATION");
+    }
+    // And with no context at all, which is how a legacy record reads.
+    expect(getStatusMessage("HOLD_FOR_VERIFICATION")).toMatch(/Do not commence the operation/);
+    expect(getHoldInstruction(undefined)).toBe("DO NOT COMMENCE THE OPERATION");
+  });
+
+  it("accepts a whole result, an operation context or a bare state", () => {
+    const expected = getStatusMessage("HOLD_FOR_VERIFICATION", { state: "OPERATION_ACTIVE" });
+    expect(getStatusMessage("HOLD_FOR_VERIFICATION", "OPERATION_ACTIVE")).toBe(expected);
+    expect(
+      getStatusMessage("HOLD_FOR_VERIFICATION", { operation_context: { state: "OPERATION_ACTIVE" } })
+    ).toBe(expected);
   });
 
   it("labels verification points as blocking or routine", () => {
