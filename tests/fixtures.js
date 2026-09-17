@@ -654,3 +654,154 @@ export const crackedWeldDescribedWithHedge = {
   compliant_controls: [],
   notes: "",
 };
+
+/**
+ * The 16 September 2026 field failure, as the production build reported it.
+ *
+ * Two chain blocks hung from beam clamps on a structural beam came back as an
+ * "overhead travelling crane". Once a crane was named, no clamp check was ever
+ * asked — not the device type, not its rated WLL, not its fit to the flange, and
+ * not the line of force through it, which is the thing that was visibly wrong.
+ * A TotalEnergies Lifting Authority spotted the side loading on sight.
+ *
+ * The three supporting mistakes are here too: the colour-coding tag listed as
+ * proof the hoists were in date, a connection claimed above the hoists that the
+ * photograph does not show, and the colour code described as mandatory.
+ */
+export const beamClampsMisreadAsOverheadCrane = {
+  equipment: {
+    type: "Overhead travelling crane",
+    category: "Lifting equipment",
+    model_estimate: "Beam-mounted twin hoist",
+  },
+  operation_context: {
+    state: "OPERATION_ACTIVE",
+    visible_basis: "Two chain hoists are taking the load, which is suspended clear of the deck.",
+    confidence: 86,
+  },
+  confidence: 80,
+  hazards: [],
+  verification_points: [
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Load mass against the rated capacity of the crane",
+      reason_unverified: "The load mass is not marked or visible.",
+      verification_kind: "OPERATION_PREREQUISITE",
+      required_check: "Confirm the load mass against the rated capacity before the lift continues.",
+      blocking_before_use: true,
+      blocking_reason:
+        "The load mass must be matched to the rated capacity of the lifting equipment and cannot be established from the image.",
+    },
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Crane thorough examination status",
+      reason_unverified: "The examination record is not visible in the photograph.",
+      verification_kind: "ROUTINE_PRE_USE",
+      required_check: "Competent person to confirm the crane is within its thorough examination period.",
+      blocking_before_use: false,
+    },
+  ],
+  compliant_controls: [
+    {
+      evidence_type: "VISIBLE_COMPLIANT_CONTROL",
+      description: "Inspection colour-coding tag visible on each chain block, confirming the hoists are in date",
+    },
+    { evidence_type: "VISIBLE_COMPLIANT_CONTROL", description: "Both chain blocks connected to a single crane hook" },
+    { evidence_type: "VISIBLE_COMPLIANT_CONTROL", description: "Operatives wearing hard hats" },
+  ],
+  notes: "Overhead travelling crane in use with the current colour code displayed, as required.",
+};
+
+/**
+ * The same photograph read under the corrected suspension-method rule.
+ *
+ * The arrangement is named from what is visible — chain blocks on clamp-type
+ * attachments — so the clamp checks follow, and the angled chain runs are reported
+ * as the visible concern they are. Three of the verification points arrive
+ * non-blocking on purpose: with the load in the air the validator escalates them.
+ */
+export const chainBlocksOnBeamClamps = {
+  equipment: {
+    type: "Two chain blocks suspended from clamp-type attachments on a structural beam",
+    category: "Lifting equipment",
+    model_estimate: "",
+  },
+  operation_context: {
+    state: "OPERATION_ACTIVE",
+    visible_basis: "Both chain blocks are taking the load and the load is suspended clear of the deck.",
+    confidence: 86,
+  },
+  confidence: 82,
+  hazards: [
+    {
+      evidence_type: "VISIBLE_UNSAFE_CONDITION",
+      severity: "MEDIUM",
+      category: "STRUCTURAL",
+      description: "Chain runs at both clamp attachments hang away from the vertical, side loading the clamps",
+      visible_evidence:
+        "Both load chains lead away from the vertical beneath their clamps rather than in line with the clamp body.",
+      location: "Beneath both clamps on the beam lower flange",
+      regulation: "LOLER 1998",
+      action:
+        "Hold the operation and confirm the manufacturer's permitted angle of loading and WLL for these clamps before the load is moved further.",
+      confidence: 84,
+    },
+  ],
+  verification_points: [
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Manufacturer's permitted angle of loading and WLL for the clamps in use",
+      reason_unverified: "The make, model and permitted loading angle of the clamps are not readable in the photograph.",
+      verification_kind: "OPERATION_PREREQUISITE",
+      location: "Beam lower flange, both attachments",
+      regulation: "LOLER 1998",
+      required_check:
+        "Competent person to identify the clamps and confirm against the manufacturer's information whether any angle of loading is permitted and at what WLL.",
+      blocking_before_use: true,
+      blocking_reason:
+        "Side loading of beam clamps is generally forbidden and the manufacturer's permitted angle and rated capacity for these clamps cannot be established from the image.",
+    },
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Clamp type, rated WLL and fit to the beam flange",
+      reason_unverified: "The flange width and thickness and the clamp markings cannot be read from the photograph.",
+      verification_kind: "ROUTINE_PRE_USE",
+      location: "Beam lower flange",
+      required_check:
+        "Competent person to confirm each clamp is the correct type and WLL for this load and is correctly fitted to the flange.",
+      blocking_before_use: false,
+    },
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Load sharing between the two chain blocks",
+      reason_unverified: "How the load divides between the blocks cannot be established from a single photograph.",
+      verification_kind: "ROUTINE_PRE_USE",
+      required_check: "Competent person to confirm how the load is shared and that neither block is overloaded.",
+      blocking_before_use: false,
+    },
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Exclusion zone beneath the suspended load",
+      reason_unverified: "The full area beneath the load is outside the frame.",
+      verification_kind: "ROUTINE_PRE_USE",
+      required_check: "Confirm the exclusion zone beneath the load is established and that nobody is underneath it.",
+      blocking_before_use: false,
+    },
+    {
+      evidence_type: "VERIFICATION_REQUIRED",
+      description: "Chain block identification tags — currency, legibility and the site colour-coding scheme",
+      reason_unverified: "Tags are present but the detail is not legible at this resolution.",
+      verification_kind: "ROUTINE_PRE_USE",
+      required_check:
+        "Competent person to read each tag and confirm identification and currency against the site's current colour-coding scheme.",
+      blocking_before_use: false,
+    },
+  ],
+  compliant_controls: [
+    { evidence_type: "VISIBLE_COMPLIANT_CONTROL", description: "Identification tag visible on each chain block" },
+    { evidence_type: "VISIBLE_COMPLIANT_CONTROL", description: "Exclusion zone barrier visible beneath the load" },
+    { evidence_type: "VISIBLE_COMPLIANT_CONTROL", description: "Operatives wearing hard hats" },
+  ],
+  notes:
+    "Chain blocks are rigged to clamp-type attachments on a structural beam; the arrangement above the clamps is not visible and cannot be confirmed from this photograph.",
+};

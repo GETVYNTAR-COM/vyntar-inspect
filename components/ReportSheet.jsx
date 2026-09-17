@@ -3,6 +3,7 @@
 import {
   getCompliantControls,
   getHazards,
+  getHoldInstruction,
   getResultNarrative,
   getStatusMessage,
   getStatusPresentation,
@@ -40,12 +41,12 @@ export default function ReportSheet({ photoDataUrl, metadata, result, signatureD
           Result: {getStatusPresentation(result.overall_status).label}
           {critical ? " — REMOVE FROM SERVICE" : ""}
           {fail ? " — WITHDRAW FROM USE UNTIL ASSESSED" : ""}
-          {hold ? " — DO NOT COMMENCE THE OPERATION" : ""}
+          {hold ? ` — ${getHoldInstruction(result.operation_context)}` : ""}
         </p>
         <p className="text-sm">
           {getResultNarrative(result)} AI confidence {result.confidence}%.
         </p>
-        <p className="text-[11px] mt-1">{getStatusMessage(result.overall_status)}</p>
+        <p className="text-[11px] mt-1">{getStatusMessage(result.overall_status, result.operation_context)}</p>
       </div>
 
       <table className="w-full text-sm mb-4 border-collapse">

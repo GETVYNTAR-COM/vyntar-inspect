@@ -42,7 +42,7 @@ export default function ResultsPanel({ result }) {
           <div className="bg-void rounded-md p-4">
             <p className="font-display uppercase tracking-[0.14em] text-signal text-sm mb-1">Stop — out of service</p>
             <h2 className="font-display uppercase font-bold text-3xl text-bone leading-none">Critical hazard detected</h2>
-            <p className="text-sm text-dim mt-2">{getStatusMessage(status)}</p>
+            <p className="text-sm text-dim mt-2">{getStatusMessage(status, result.operation_context)}</p>
           </div>
         </div>
       ) : fail ? (
@@ -51,7 +51,7 @@ export default function ResultsPanel({ result }) {
             Withdraw from use — competent person assessment required
           </p>
           <h2 className="font-display uppercase font-bold text-3xl text-bone leading-none">Do not use pending assessment</h2>
-          <p className="text-sm text-dim mt-2">{getStatusMessage(status)}</p>
+          <p className="text-sm text-dim mt-2">{getStatusMessage(status, result.operation_context)}</p>
         </div>
       ) : (
         <div className={`bg-panel border rounded-lg p-4 ${hold || conditional ? "border-amber/50" : "border-pass/50"}`}>
@@ -63,7 +63,7 @@ export default function ResultsPanel({ result }) {
             {hold && <span aria-hidden="true">✋</span>}
             {hold ? "Hold for verification" : conditional ? "Conditional pass" : "Pass"}
           </h2>
-          <p className="text-sm text-dim mt-2">{getStatusMessage(status)}</p>
+          <p className="text-sm text-dim mt-2">{getStatusMessage(status, result.operation_context)}</p>
         </div>
       )}
 

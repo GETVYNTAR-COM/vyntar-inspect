@@ -32,6 +32,21 @@ Analysis output is split into three streams and only the first is counted or sco
 
 A hold applies only where the photograph shows an operation imminent or active and a mandatory prerequisite for it cannot be established; it always reports risk as `—` (pending physical verification), never zero. An unreadable tag on a routine equipment photograph is a non-blocking verification point.
 
+Two further rules are enforced in the validator, not the prompt. Where a load is
+visibly suspended (`OPERATION_ACTIVE` with the operation context saying the load is
+off the ground), verification of load sharing and the rigging configuration, of the
+attachment points carrying the load, and of the exclusion zone beneath it are
+escalated from routine checks to blocking hold points — so most live-lift
+photographs hold, which is the intended behaviour. And a compliant control is
+removed where any hazard or verification point says the same item or aspect cannot
+be verified: verification wins, because a green line on the report outranks a hold
+point three sections below it. A hold on an operation already under way reads
+"STOP / HOLD THE OPERATION — do not continue"; a hold before work starts keeps
+"do not commence".
+
+Expert field corrections raised against a signed record are logged, append-only, in
+`docs/audit-corrections/`.
+
 Records saved before this split still render: they have no verification points, string `compliant_controls` and a model-supplied risk score, and are never rewritten or reanalysed.
 
 ## Notes
